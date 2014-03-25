@@ -1,0 +1,52 @@
+#! /bin/bash
+
+for source_file in $1/*;
+do
+    INPUT=$source_file;
+    OUTPUT=`echo $INPUT | sed "s/^.*\//$2\//" | sed -r 's/[^.]+$/timestamp.jpg/i'`;
+
+    WIDTH=`identify -format %w "$INPUT"`;
+    HEIGHT=`identify -format %h "$INPUT"`;
+
+    CWIDTH=800;
+    RATIO=`echo "$WIDTH/$CWIDTH" | bc -l`;
+
+    ROTATE=''
+    if (( $WIDTH < $HEIGHT )); then
+        ROTATE='-rotate -90';
+        RATIO=`echo "$HEIGHT/$CWIDTH" | bc -l`;
+    fi
+
+    FONTSIZE=30;
+    FONTSIZE=`echo "$FONTSIZE*$RATIO" | bc -l`;
+
+    STROKE='';
+    if (( $WIDTH > 999 )); then
+        STROKE='-strokewidth 1 -stroke black';
+    fi
+
+    TIMESTAMP_POSITION=+`echo "40*$RATIO" | bc -l`+`echo "25*$RATIO" | bc -l`;
+
+    EXIF_DATE=`exiv2 pr -P v -g Exif.Photo.DateTimeOriginal "$INPUT" | sed 's/:/\//' | sed 's/:/\//'`
+    if [[ -n $EXIF_DATE ]]; then
+        DATE=`date -d "$EXIF_DATE" '+%Y/%m/%d %H:%M'`
+    else
+        DATE=`echo "$INPUT" | sed 's/^.*\([0-9]\{4\}\)\([0-9]\{2\}\)\([0-9]\{2\}\)\(.*\)$/\1\/\2\/\3\4/' | sed 's/^\(.\{10\}\).\([0-9]\{2\}\)\([0-9]\{2\}\).*$/\1 \2:\3/' | sed 's/\(-\|_\).*//'`
+    fi
+
+    TIMESTAMP=$DATE;
+
+
+    echo -e "";
+    echo $DATE;
+
+    echo -e "font-size: $FONTSIZE";
+    echo "output: '$OUTPUT'";
+
+    convert "$INPUT" -quality 100 -compress JPEG \
+        -gravity southeast \
+        -fill "#ff9600" -font "Nimbus-Mono-Bold" -pointsize $FONTSIZE $STROKE\
+        $ROTATE \
+        -annotate $TIMESTAMP_POSITION \
+        "$TIMESTAMP" "$OUTPUT"
+done
